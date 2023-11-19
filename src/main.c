@@ -87,6 +87,8 @@
  */
 #define INPUT_REPORT_KEYS_MAX_LEN (1 + 1 + KEY_PRESS_MAX)
 
+uint8_t buttonValues = 0;
+
 /* Current report map construction requires exactly 8 buttons */
 BUILD_ASSERT((KEY_CTRL_CODE_MAX - KEY_CTRL_CODE_MIN) + 1 == 8);
 
@@ -450,89 +452,26 @@ static void hid_init(void)
 	int err;
 	struct bt_hids_init_param hids_init_obj = {0};
 	struct bt_hids_inp_rep *hids_inp_rep;
-	struct bt_hids_outp_feat_rep *hids_outp_rep;
 
 	static const uint8_t report_map[] = {
-		0x05,
-		0x01, /* Usage Page (Generic Desktop) */
-		0x09,
-		0x06, /* Usage (Keyboard) */
-		0xA1,
-		0x01, /* Collection (Application) */
 
-	/* Keys */
-#if INPUT_REP_KEYS_REF_ID
-		0x85,
-		INPUT_REP_KEYS_REF_ID,
-#endif
-		0x05,
-		0x07, /* Usage Page (Key Codes) */
-		0x19,
-		0xe0, /* Usage Minimum (224) */
-		0x29,
-		0xe7, /* Usage Maximum (231) */
-		0x15,
-		0x00, /* Logical Minimum (0) */
-		0x25,
-		0x01, /* Logical Maximum (1) */
-		0x75,
-		0x01, /* Report Size (1) */
-		0x95,
-		0x08, /* Report Count (8) */
-		0x81,
-		0x02, /* Input (Data, Variable, Absolute) */
-
-		0x95,
-		0x01, /* Report Count (1) */
-		0x75,
-		0x08, /* Report Size (8) */
-		0x81,
-		0x01, /* Input (Constant) reserved byte(1) */
-
-		0x95,
-		0x06, /* Report Count (6) */
-		0x75,
-		0x08, /* Report Size (8) */
-		0x15,
-		0x00, /* Logical Minimum (0) */
-		0x25,
-		0x65, /* Logical Maximum (101) */
-		0x05,
-		0x07, /* Usage Page (Key codes) */
-		0x19,
-		0x00, /* Usage Minimum (0) */
-		0x29,
-		0x65, /* Usage Maximum (101) */
-		0x81,
-		0x00, /* Input (Data, Array) Key array(6 bytes) */
-
-	/* LED */
-#if OUTPUT_REP_KEYS_REF_ID
-		0x85,
-		OUTPUT_REP_KEYS_REF_ID,
-#endif
-		0x95,
-		0x05, /* Report Count (5) */
-		0x75,
-		0x01, /* Report Size (1) */
-		0x05,
-		0x08, /* Usage Page (Page# for LEDs) */
-		0x19,
-		0x01, /* Usage Minimum (1) */
-		0x29,
-		0x05, /* Usage Maximum (5) */
-		0x91,
-		0x02, /* Output (Data, Variable, Absolute), */
-		/* Led report */
-		0x95,
-		0x01, /* Report Count (1) */
-		0x75,
-		0x03, /* Report Size (3) */
-		0x91,
-		0x01, /* Output (Data, Variable, Absolute), */
-		/* Led report padding */
-
-		0xC0 /* End Collection (Application) */
+		0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+		0x09, 0x05, // USAGE (Game Pad)
+		0xa1, 0x01, // COLLECTION (Application)
+		0xa1, 0x00, //   COLLECTION (Physical)
+					// ReportID - 8 bits
+					//		0x85, 0x01, //     REPORT_ID (1)
+		// Buttons - 8 bits
+		0x05, 0x09, //     USAGE_PAGE (Button)
+		0x19, 0x01, //     USAGE_MINIMUM (Button 1)
+		0x29, 0x08, //     USAGE_MAXIMUM (Button 8)
+		0x15, 0x00, //     LOGICAL_MINIMUM (0)
+		0x25, 0x01, //     LOGICAL_MAXIMUM (1)
+		0x75, 0x01, //     REPORT_SIZE (1)
+		0x95, 0x08, //     REPORT_COUNT (8)
+		0x81, 0x02, //     INPUT (Data,Var,Abs)
+		0xc0,		//     END_COLLECTION
+		0xc0		// END_COLLECTION
 	};
 
 	hids_init_obj.rep_map.data = report_map;
@@ -544,20 +483,11 @@ static void hid_init(void)
 								BT_HIDS_NORMALLY_CONNECTABLE);
 
 	hids_inp_rep =
-		&hids_init_obj.inp_rep_group_init.reports[INPUT_REP_KEYS_IDX];
-	hids_inp_rep->size = INPUT_REPORT_KEYS_MAX_LEN;
+		&hids_init_obj.inp_rep_group_init.reports[0];
+	hids_inp_rep->size = 1; // 1; // 2;
 	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
 	hids_init_obj.inp_rep_group_init.cnt++;
 
-	hids_outp_rep =
-		&hids_init_obj.outp_rep_group_init.reports[OUTPUT_REP_KEYS_IDX];
-	hids_outp_rep->size = OUTPUT_REPORT_MAX_LEN;
-	hids_outp_rep->id = OUTPUT_REP_KEYS_REF_ID;
-	hids_outp_rep->handler = hids_outp_rep_handler;
-	hids_init_obj.outp_rep_group_init.cnt++;
-
-	hids_init_obj.is_kb = true;
-	hids_init_obj.boot_kb_outp_rep_handler = hids_boot_kb_outp_rep_handler;
 	hids_init_obj.pm_evt_handler = hids_pm_evt_handler;
 
 	err = bt_hids_init(&hids_obj, &hids_init_obj);
@@ -699,31 +629,7 @@ static int key_report_con_send(const struct keyboard_state *state,
 							   struct bt_conn *conn)
 {
 	int err = 0;
-	uint8_t data[INPUT_REPORT_KEYS_MAX_LEN];
-	uint8_t *key_data;
-	const uint8_t *key_state;
-	size_t n;
 
-	data[0] = state->ctrl_keys_state;
-	data[1] = 0;
-	key_data = &data[2];
-	key_state = state->keys_state;
-
-	for (n = 0; n < KEY_PRESS_MAX; ++n)
-	{
-		*key_data++ = *key_state++;
-	}
-	if (boot_mode)
-	{
-		err = bt_hids_boot_kb_inp_rep_send(&hids_obj, conn, data,
-										   sizeof(data), NULL);
-	}
-	else
-	{
-		err = bt_hids_inp_rep_send(&hids_obj, conn,
-								   INPUT_REP_KEYS_IDX, data,
-								   sizeof(data), NULL);
-	}
 	return err;
 }
 
@@ -872,15 +778,36 @@ static void button_text_changed(bool down)
 
 	if (down)
 	{
-		hid_buttons_press(chr, 1);
+
+		{
+			int err;
+
+			struct gamepad_report_t
+			{
+				//			uint8_t report_id;
+				uint8_t buttons;
+			};
+			struct gamepad_report_t gamepad;
+			//	uint8_t buttons[1];
+			//	buttons[0] = 1;
+
+			//	gamepad.report_id = 1;
+
+			gamepad.buttons = buttonValues;
+
+			printk("Button values sent %d\n", gamepad.buttons);
+			buttonValues++;
+
+			err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
+		}
 	}
 	else
 	{
-		hid_buttons_release(chr, 1);
-		if (++chr == (hello_world_str + sizeof(hello_world_str)))
-		{
-			chr = hello_world_str;
-		}
+		// hid_buttons_release(chr, 1);
+		// if (++chr == (hello_world_str + sizeof(hello_world_str)))
+		// {
+		// 	chr = hello_world_str;
+		// }
 	}
 }
 
