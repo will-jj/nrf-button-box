@@ -87,7 +87,8 @@
  */
 #define INPUT_REPORT_KEYS_MAX_LEN (1 + 1 + KEY_PRESS_MAX)
 
-uint8_t buttonValues = 0;
+uint8_t button_values = 0;
+int8_t axis_values = -127;
 
 /* Current report map construction requires exactly 8 buttons */
 BUILD_ASSERT((KEY_CTRL_CODE_MAX - KEY_CTRL_CODE_MIN) + 1 == 8);
@@ -458,7 +459,6 @@ static void hid_init(void)
 		0x05, 0x01, // USAGE_PAGE (Generic Desktop)
 		0x09, 0x05, // USAGE (Game Pad)
 		0xa1, 0x01, // COLLECTION (Application)
-		0xa1, 0x00, //   COLLECTION (Physical)
 					// ReportID - 8 bits
 					//		0x85, 0x01, //     REPORT_ID (1)
 		// Buttons - 8 bits
@@ -470,8 +470,16 @@ static void hid_init(void)
 		0x75, 0x01, //     REPORT_SIZE (1)
 		0x95, 0x08, //     REPORT_COUNT (8)
 		0x81, 0x02, //     INPUT (Data,Var,Abs)
-		0xc0,		//     END_COLLECTION
-		0xc0		// END_COLLECTION
+		0x05, 0x01, //   Usage Page (Generic Desktop Ctrls)
+		0x09, 0x30, //   Usage (X)
+		0x09, 0x31, //   Usage (Y)
+		0x15, 0x81, //   Logical Minimum (-127)
+		0x25, 0x7F, //   Logical Maximum (127)
+		0x75, 0x08, //   Report size (8)
+		0x95, 0x02, //     REPORT_COUNT (2)
+		0x81, 0x02, // Input
+
+		0xc0 // END_COLLECTION
 	};
 
 	hids_init_obj.rep_map.data = report_map;
@@ -484,7 +492,7 @@ static void hid_init(void)
 
 	hids_inp_rep =
 		&hids_init_obj.inp_rep_group_init.reports[0];
-	hids_inp_rep->size = 1; // 1; // 2;
+	hids_inp_rep->size = 3; // 1; // 2;
 	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
 	hids_init_obj.inp_rep_group_init.cnt++;
 
@@ -784,19 +792,20 @@ static void button_text_changed(bool down)
 
 			struct gamepad_report_t
 			{
-				//			uint8_t report_id;
+				//		uint8_t report_id;
 				uint8_t buttons;
+				uint8_t x_axis;
+				uint8_t y_axis;
 			};
 			struct gamepad_report_t gamepad;
-			//	uint8_t buttons[1];
-			//	buttons[0] = 1;
 
-			//	gamepad.report_id = 1;
-
-			gamepad.buttons = buttonValues;
+			gamepad.buttons = button_values;
+			gamepad.x_axis = button_values; // axis_values;
+			gamepad.y_axis = button_values; // axis_values;
 
 			printk("Button values sent %d\n", gamepad.buttons);
-			buttonValues++;
+			button_values++;
+			axis_values++;
 
 			err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
 		}
