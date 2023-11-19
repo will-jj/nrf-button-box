@@ -459,9 +459,6 @@ static void hid_init(void)
 		0x05, 0x01, // USAGE_PAGE (Generic Desktop)
 		0x09, 0x05, // USAGE (Game Pad)
 		0xa1, 0x01, // COLLECTION (Application)
-					// ReportID - 8 bits
-					//		0x85, 0x01, //     REPORT_ID (1)
-		// Buttons - 8 bits
 		0x05, 0x09, //     USAGE_PAGE (Button)
 		0x19, 0x01, //     USAGE_MINIMUM (Button 1)
 		0x29, 0x08, //     USAGE_MAXIMUM (Button 8)
@@ -473,10 +470,12 @@ static void hid_init(void)
 		0x05, 0x01, //   Usage Page (Generic Desktop Ctrls)
 		0x09, 0x30, //   Usage (X)
 		0x09, 0x31, //   Usage (Y)
+		0x09, 0x32, //   Usage (Z)
+		0x09, 0x35, //   Usage (Rz)
 		0x15, 0x81, //   Logical Minimum (-127)
 		0x25, 0x7F, //   Logical Maximum (127)
 		0x75, 0x08, //   Report size (8)
-		0x95, 0x02, //     REPORT_COUNT (2)
+		0x95, 0x04, //     REPORT_COUNT (4)
 		0x81, 0x02, // Input
 
 		0xc0 // END_COLLECTION
@@ -492,7 +491,7 @@ static void hid_init(void)
 
 	hids_inp_rep =
 		&hids_init_obj.inp_rep_group_init.reports[0];
-	hids_inp_rep->size = 3; // 1; // 2;
+	hids_inp_rep->size = 5; // 1; // 2;
 	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
 	hids_init_obj.inp_rep_group_init.cnt++;
 
@@ -794,14 +793,18 @@ static void button_text_changed(bool down)
 			{
 				//		uint8_t report_id;
 				uint8_t buttons;
-				uint8_t x_axis;
-				uint8_t y_axis;
+				int8_t x_axis;
+				int8_t y_axis;
+				int8_t z_axis;
+				int8_t rz_axis;
 			};
 			struct gamepad_report_t gamepad;
 
 			gamepad.buttons = button_values;
-			gamepad.x_axis = button_values; // axis_values;
-			gamepad.y_axis = button_values; // axis_values;
+			gamepad.x_axis = axis_values;
+			gamepad.y_axis = axis_values;
+			gamepad.z_axis = axis_values;
+			gamepad.rz_axis = axis_values;
 
 			printk("Button values sent %d\n", gamepad.buttons);
 			button_values++;
