@@ -15,6 +15,7 @@
 #include <soc.h>
 #include <assert.h>
 #include <zephyr/spinlock.h>
+#include <zephyr/sys/util.h>
 
 #include <zephyr/settings/settings.h>
 
@@ -30,6 +31,9 @@
 #include <dk_buttons_and_leds.h>
 
 #include "app_nfc.h"
+
+#define WHEEL_START_BIT 4
+#define WHEEL_BT_0 BIT(WHEEL_START_BIT)
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
@@ -147,6 +151,17 @@ static const uint8_t hello_world_str[] = {
 	0x12, /* Key o */
 	0x28, /* Key Return */
 };
+
+struct gamepad_report_t
+{
+	//		uint8_t report_id;
+	uint8_t buttons;
+	int8_t x_axis;
+	int8_t y_axis;
+	int8_t z_axis;
+	int8_t rz_axis;
+};
+struct gamepad_report_t gamepad;
 
 static const uint8_t shift_key[] = {225};
 
@@ -779,48 +794,24 @@ static int hid_buttons_release(const uint8_t *keys, size_t cnt)
 	return key_report_send();
 }
 
+static void button_state_changed(uint32_t button_state)
+{
+	int err;
+	gamepad.buttons = (uint8_t)(button_state >> WHEEL_START_BIT);
+	err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
+}
+
 static void button_text_changed(bool down)
 {
-	static const uint8_t *chr = hello_world_str;
 
-	if (down)
-	{
-
-		{
-			int err;
-
-			struct gamepad_report_t
-			{
-				//		uint8_t report_id;
-				uint8_t buttons;
-				int8_t x_axis;
-				int8_t y_axis;
-				int8_t z_axis;
-				int8_t rz_axis;
-			};
-			struct gamepad_report_t gamepad;
-
-			gamepad.buttons = button_values;
-			gamepad.x_axis = axis_values;
-			gamepad.y_axis = axis_values;
-			gamepad.z_axis = axis_values;
-			gamepad.rz_axis = axis_values;
-
-			printk("Button values sent %d\n", gamepad.buttons);
-			button_values++;
-			axis_values++;
-
-			err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
-		}
-	}
-	else
-	{
-		// hid_buttons_release(chr, 1);
-		// if (++chr == (hello_world_str + sizeof(hello_world_str)))
-		// {
-		// 	chr = hello_world_str;
-		// }
-	}
+	// if (down)
+	// {
+	// 	WRITE_BIT(gamepad.buttons, 0, 1);
+	// }
+	// else
+	// {
+	// 	WRITE_BIT(gamepad.buttons, 0, 0);
+	// }
 }
 
 static void button_shift_changed(bool down)
@@ -900,14 +891,13 @@ static void button_changed(uint32_t button_state, uint32_t has_changed)
 		return;
 	}
 
-	if (has_changed & KEY_TEXT_MASK)
+	// we have done an interrupted you're meant to check this against specific buttons like above :)
+	// check if it is in our range pro gamer move
+	if (has_changed >= WHEEL_BT_0)
 	{
-		button_text_changed((button_state & KEY_TEXT_MASK) != 0);
+		button_state_changed(button_state);
 	}
-	if (has_changed & KEY_SHIFT_MASK)
-	{
-		button_shift_changed((button_state & KEY_SHIFT_MASK) != 0);
-	}
+
 #if CONFIG_NFC_OOB_PAIRING
 	if (has_changed & KEY_ADV_MASK)
 	{
@@ -949,7 +939,7 @@ static void bas_notify(void)
 {
 	uint8_t battery_level = bt_bas_get_battery_level();
 
-	battery_level--;
+	// battery_level--;
 
 	if (!battery_level)
 	{
