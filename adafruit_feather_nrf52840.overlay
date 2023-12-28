@@ -1,0 +1,77 @@
+// To get started, press Ctrl+Space to bring up the completion menu and view the available nodes.
+
+// You can also use the buttons in the sidebar to perform actions on nodes.
+// Actions currently available include:
+
+// * Enabling / disabling the node
+// * Adding the bus to a bus
+// * Removing the node
+// * Connecting ADC channels
+
+// For more help, browse the DeviceTree documentation at https: //docs.zephyrproject.org/latest/guides/dts/index.html
+// You can also visit the nRF DeviceTree extension documentation at https: //nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+/ {
+    buttons {
+        compatible = "gpio-keys";
+        button2: button_2 {
+            gpios = <&gpio1 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 0";
+        };
+        button3: button_3 {
+            gpios = <&gpio0 7 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 1";
+        };
+        button4: button_4 {
+            gpios = <&gpio0 26 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 2";
+        };
+        button5: button_5 {
+            gpios = <&gpio0 27 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 3";
+        };
+        button6: button_6 {
+            gpios = <&gpio0 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 4";
+        };
+        button7: button_7 {
+            gpios = <&gpio0 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 5";
+        };
+        button8: button_8 {
+            gpios = <&gpio1 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 6";
+        };
+        button9: button_9 {
+            gpios = <&gpio0 10 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 7";
+        };
+        button10: button_10 {
+            gpios = <&gpio0 3 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 8";
+        };
+        button11: button_11 {
+            gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 9";
+        };
+        button12: button_12 {
+            gpios = <&gpio0 28 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 10";
+        };
+        button13: button_13 {
+            gpios = <&gpio0 30 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 11";
+        };
+        button14: button_14 {
+            gpios = <&gpio0 5 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 12";
+        };
+        button15: button_15 {
+            gpios = <&gpio0 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Push button meme 13";
+        };
+    };
+};
+
+&uicr {
+    nfct-pins-as-gpios;
+};
