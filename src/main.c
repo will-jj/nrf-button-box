@@ -31,6 +31,7 @@
 #include <dk_buttons_and_leds.h>
 
 #include "app_nfc.h"
+#include "battery.h"
 
 #define WHEEL_START_BIT CONFIG_NUM_ON_BOARD_BUTTONS
 #define WHEEL_BT_0 BIT(WHEEL_START_BIT)
@@ -164,6 +165,25 @@ struct gamepad_report_t
 struct gamepad_report_t gamepad;
 
 static const uint8_t shift_key[] = {225};
+
+/** A discharge curve specific to the power source. */
+static const struct battery_level_point levels[] = {
+	/* "Curve" here eyeballed from captured data for the [Adafruit
+	 * 3.7v 2000 mAh](https://www.adafruit.com/product/2011) LIPO
+	 * under full load that started with a charge of 3.96 V and
+	 * dropped about linearly to 3.58 V over 15 hours.  It then
+	 * dropped rapidly to 3.10 V over one hour, at which point it
+	 * stopped transmitting.
+	 *
+	 * Based on eyeball comparisons we'll say that 15/16 of life
+	 * goes between 4.2 and 3.55 V, and 1/16 goes between 3.55 V
+	 * and 3.1 V.
+	 */
+
+	{10000, 4200},
+	{625, 3550},
+	{0, 3100},
+};
 
 /* Current report status
  */
@@ -937,20 +957,22 @@ static void configure_gpio(void)
 
 static void bas_notify(void)
 {
-	uint8_t battery_level = bt_bas_get_battery_level();
-
-	// battery_level--;
-
-	if (!battery_level)
-	{
-		battery_level = 100U;
-	}
-
-	bt_bas_set_battery_level(battery_level);
+	int batt_mV = battery_sample();
+	unsigned int batt_pptt = battery_level_pptt(batt_mV, levels) / 100;
+	bt_bas_set_battery_level(batt_pptt);
 }
 
 int main(void)
 {
+
+	int rc = battery_measure_enable(true);
+
+	if (rc != 0)
+	{
+		printk("Failed initialize battery measurement: %d\n", rc);
+		return 0;
+	}
+
 	int err;
 	int blink_status = 0;
 
