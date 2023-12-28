@@ -144,15 +144,6 @@ static struct conn_mode
 	bool in_boot_mode;
 } conn_mode[CONFIG_BT_HIDS_MAX_CLIENT_COUNT];
 
-static const uint8_t hello_world_str[] = {
-	0x0b, /* Key h */
-	0x08, /* Key e */
-	0x0f, /* Key l */
-	0x0f, /* Key l */
-	0x12, /* Key o */
-	0x28, /* Key Return */
-};
-
 struct gamepad_report_t
 {
 	//		uint8_t report_id;
@@ -163,8 +154,6 @@ struct gamepad_report_t
 	int8_t rz_axis;
 };
 struct gamepad_report_t gamepad;
-
-static const uint8_t shift_key[] = {225};
 
 /** A discharge curve specific to the power source. */
 static const struct battery_level_point levels[] = {
@@ -184,14 +173,6 @@ static const struct battery_level_point levels[] = {
 	{625, 3550},
 	{0, 3100},
 };
-
-/* Current report status
- */
-static struct keyboard_state
-{
-	uint8_t ctrl_keys_state; /* Current keys state */
-	uint8_t keys_state[KEY_PRESS_MAX];
-} hid_keyboard_state;
 
 #if CONFIG_NFC_OOB_PAIRING
 static struct k_work adv_work;
@@ -658,192 +639,11 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
 	.pairing_complete = pairing_complete,
 	.pairing_failed = pairing_failed};
 
-/** @brief Function process keyboard state and sends it
- *
- *  @param pstate     The state to be sent
- *  @param boot_mode  Information if boot mode protocol is selected.
- *  @param conn       Connection handler
- *
- *  @return 0 on success or negative error code.
- */
-static int key_report_con_send(const struct keyboard_state *state,
-							   bool boot_mode,
-							   struct bt_conn *conn)
-{
-	int err = 0;
-
-	return err;
-}
-
-/** @brief Function process and send keyboard state to all active connections
- *
- * Function process global keyboard state and send it to all connected
- * clients.
- *
- * @return 0 on success or negative error code.
- */
-static int key_report_send(void)
-{
-	for (size_t i = 0; i < CONFIG_BT_HIDS_MAX_CLIENT_COUNT; i++)
-	{
-		if (conn_mode[i].conn)
-		{
-			int err;
-
-			err = key_report_con_send(&hid_keyboard_state,
-									  conn_mode[i].in_boot_mode,
-									  conn_mode[i].conn);
-			if (err)
-			{
-				printk("Key report send error: %d\n", err);
-				return err;
-			}
-		}
-	}
-	return 0;
-}
-
-/** @brief Change key code to ctrl code mask
- *
- *  Function changes the key code to the mask in the control code
- *  field inside the raport.
- *  Returns 0 if key code is not a control key.
- *
- *  @param key Key code
- *
- *  @return Mask of the control key or 0.
- */
-static uint8_t button_ctrl_code(uint8_t key)
-{
-	if (KEY_CTRL_CODE_MIN <= key && key <= KEY_CTRL_CODE_MAX)
-	{
-		return (uint8_t)(1U << (key - KEY_CTRL_CODE_MIN));
-	}
-	return 0;
-}
-
-static int hid_kbd_state_key_set(uint8_t key)
-{
-	uint8_t ctrl_mask = button_ctrl_code(key);
-
-	if (ctrl_mask)
-	{
-		hid_keyboard_state.ctrl_keys_state |= ctrl_mask;
-		return 0;
-	}
-	for (size_t i = 0; i < KEY_PRESS_MAX; ++i)
-	{
-		if (hid_keyboard_state.keys_state[i] == 0)
-		{
-			hid_keyboard_state.keys_state[i] = key;
-			return 0;
-		}
-	}
-	/* All slots busy */
-	return -EBUSY;
-}
-
-static int hid_kbd_state_key_clear(uint8_t key)
-{
-	uint8_t ctrl_mask = button_ctrl_code(key);
-
-	if (ctrl_mask)
-	{
-		hid_keyboard_state.ctrl_keys_state &= ~ctrl_mask;
-		return 0;
-	}
-	for (size_t i = 0; i < KEY_PRESS_MAX; ++i)
-	{
-		if (hid_keyboard_state.keys_state[i] == key)
-		{
-			hid_keyboard_state.keys_state[i] = 0;
-			return 0;
-		}
-	}
-	/* Key not found */
-	return -EINVAL;
-}
-
-/** @brief Press a button and send report
- *
- *  @note Functions to manipulate hid state are not reentrant
- *  @param keys
- *  @param cnt
- *
- *  @return 0 on success or negative error code.
- */
-static int hid_buttons_press(const uint8_t *keys, size_t cnt)
-{
-	while (cnt--)
-	{
-		int err;
-
-		err = hid_kbd_state_key_set(*keys++);
-		if (err)
-		{
-			printk("Cannot set selected key.\n");
-			return err;
-		}
-	}
-
-	return key_report_send();
-}
-
-/** @brief Release the button and send report
- *
- *  @note Functions to manipulate hid state are not reentrant
- *  @param keys
- *  @param cnt
- *
- *  @return 0 on success or negative error code.
- */
-static int hid_buttons_release(const uint8_t *keys, size_t cnt)
-{
-	while (cnt--)
-	{
-		int err;
-
-		err = hid_kbd_state_key_clear(*keys++);
-		if (err)
-		{
-			printk("Cannot clear selected key.\n");
-			return err;
-		}
-	}
-
-	return key_report_send();
-}
-
 static void button_state_changed(uint32_t button_state)
 {
 	int err;
 	gamepad.buttons = (uint16_t)(button_state >> WHEEL_START_BIT);
 	err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
-}
-
-static void button_text_changed(bool down)
-{
-
-	// if (down)
-	// {
-	// 	WRITE_BIT(gamepad.buttons, 0, 1);
-	// }
-	// else
-	// {
-	// 	WRITE_BIT(gamepad.buttons, 0, 0);
-	// }
-}
-
-static void button_shift_changed(bool down)
-{
-	if (down)
-	{
-		hid_buttons_press(shift_key, 1);
-	}
-	else
-	{
-		hid_buttons_release(shift_key, 1);
-	}
 }
 
 static void num_comp_reply(bool accept)
