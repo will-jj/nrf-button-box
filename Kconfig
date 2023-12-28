@@ -8,6 +8,12 @@ source "Kconfig.zephyr"
 
 menu "Nordic BLE HIDS Keyboard sample"
 
+config NUM_ON_BOARD_BUTTONS
+	int "Number of onboard buttons"
+	default 1
+	range 0 255
+	help
+	  Number of buttons declared in the board (not to be included in gamepad update).
 config NFC_OOB_PAIRING
 	bool "Enable NFC OOB pairing"
 	depends on HAS_HW_NRF_NFCT

@@ -32,7 +32,7 @@
 
 #include "app_nfc.h"
 
-#define WHEEL_START_BIT 4
+#define WHEEL_START_BIT CONFIG_NUM_ON_BOARD_BUTTONS
 #define WHEEL_BT_0 BIT(WHEEL_START_BIT)
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
@@ -155,7 +155,7 @@ static const uint8_t hello_world_str[] = {
 struct gamepad_report_t
 {
 	//		uint8_t report_id;
-	uint8_t buttons;
+	uint16_t buttons;
 	int8_t x_axis;
 	int8_t y_axis;
 	int8_t z_axis;
@@ -476,11 +476,11 @@ static void hid_init(void)
 		0xa1, 0x01, // COLLECTION (Application)
 		0x05, 0x09, //     USAGE_PAGE (Button)
 		0x19, 0x01, //     USAGE_MINIMUM (Button 1)
-		0x29, 0x08, //     USAGE_MAXIMUM (Button 8)
+		0x29, 0x10, //     USAGE_MAXIMUM (Button 16)
 		0x15, 0x00, //     LOGICAL_MINIMUM (0)
 		0x25, 0x01, //     LOGICAL_MAXIMUM (1)
 		0x75, 0x01, //     REPORT_SIZE (1)
-		0x95, 0x08, //     REPORT_COUNT (8)
+		0x95, 0x10, //     REPORT_COUNT (16)
 		0x81, 0x02, //     INPUT (Data,Var,Abs)
 		0x05, 0x01, //   Usage Page (Generic Desktop Ctrls)
 		0x09, 0x30, //   Usage (X)
@@ -506,7 +506,7 @@ static void hid_init(void)
 
 	hids_inp_rep =
 		&hids_init_obj.inp_rep_group_init.reports[0];
-	hids_inp_rep->size = 5; // 1; // 2;
+	hids_inp_rep->size = 6; // 1; // 2;
 	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
 	hids_init_obj.inp_rep_group_init.cnt++;
 
@@ -797,7 +797,7 @@ static int hid_buttons_release(const uint8_t *keys, size_t cnt)
 static void button_state_changed(uint32_t button_state)
 {
 	int err;
-	gamepad.buttons = (uint8_t)(button_state >> WHEEL_START_BIT);
+	gamepad.buttons = (uint16_t)(button_state >> WHEEL_START_BIT);
 	err = bt_hids_inp_rep_send(&hids_obj, conn_mode[0].conn, 0, (uint8_t *)&gamepad, sizeof(gamepad), NULL);
 }
 
