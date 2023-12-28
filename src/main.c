@@ -24,6 +24,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/usb/class/hid.h>
 
 #include <zephyr/bluetooth/services/bas.h>
 #include <bluetooth/services/hids.h>
@@ -472,30 +473,32 @@ static void hid_init(void)
 
 	static const uint8_t report_map[] = {
 
-		0x05, 0x01, // USAGE_PAGE (Generic Desktop)
-		0x09, 0x05, // USAGE (Game Pad)
-		0xa1, 0x01, // COLLECTION (Application)
-		0x05, 0x09, //     USAGE_PAGE (Button)
-		0x19, 0x01, //     USAGE_MINIMUM (Button 1)
-		0x29, 0x10, //     USAGE_MAXIMUM (Button 16)
-		0x15, 0x00, //     LOGICAL_MINIMUM (0)
-		0x25, 0x01, //     LOGICAL_MAXIMUM (1)
-		0x75, 0x01, //     REPORT_SIZE (1)
-		0x95, 0x10, //     REPORT_COUNT (16)
-		0x81, 0x02, //     INPUT (Data,Var,Abs)
-		0x05, 0x01, //   Usage Page (Generic Desktop Ctrls)
-		0x09, 0x30, //   Usage (X)
-		0x09, 0x31, //   Usage (Y)
-		0x09, 0x32, //   Usage (Z)
-		0x09, 0x35, //   Usage (Rz)
-		0x15, 0x81, //   Logical Minimum (-127)
-		0x25, 0x7F, //   Logical Maximum (127)
-		0x75, 0x08, //   Report size (8)
-		0x95, 0x04, //     REPORT_COUNT (4)
-		0x81, 0x02, // Input
-
-		0xc0 // END_COLLECTION
-	};
+		HID_USAGE_PAGE(HID_USAGE_GEN_DESKTOP),
+		HID_USAGE(HID_USAGE_GEN_DESKTOP_GAMEPAD),
+		HID_COLLECTION(HID_COLLECTION_APPLICATION),
+		HID_USAGE_PAGE(HID_USAGE_GEN_BUTTON),
+		HID_USAGE_MIN8(1),
+		HID_USAGE_MAX8(16),
+		HID_LOGICAL_MIN8(0),
+		HID_LOGICAL_MAX8(1),
+		HID_REPORT_SIZE(1),
+		HID_REPORT_COUNT(16),
+		// INPUT (Data,Var,Abs)
+		HID_INPUT(0x02),
+		HID_USAGE_PAGE(HID_USAGE_GEN_DESKTOP),
+		HID_USAGE(HID_USAGE_GEN_DESKTOP_X),
+		HID_USAGE(HID_USAGE_GEN_DESKTOP_Y),
+		// Z
+		HID_USAGE(0x32),
+		// Rz
+		HID_USAGE(0x35),
+		HID_LOGICAL_MIN8(-127),
+		HID_LOGICAL_MAX8(127),
+		HID_REPORT_SIZE(8),
+		HID_REPORT_COUNT(4),
+		// INPUT (Data,Var,Abs)
+		HID_INPUT(0x02),
+		HID_END_COLLECTION};
 
 	hids_init_obj.rep_map.data = report_map;
 	hids_init_obj.rep_map.size = sizeof(report_map);
