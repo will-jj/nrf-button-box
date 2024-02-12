@@ -16,6 +16,8 @@
 #include <assert.h>
 #include <zephyr/spinlock.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/pwm.h>
 
 #include <zephyr/settings/settings.h>
 
@@ -155,6 +157,8 @@ struct gamepad_report_t
 	int8_t rz_axis;
 };
 struct gamepad_report_t gamepad;
+
+static const struct pwm_dt_spec pwm_led4 = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led4));
 
 /** A discharge curve specific to the power source. */
 static const struct battery_level_point levels[] = {
@@ -389,13 +393,22 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 static void caps_lock_handler(const struct bt_hids_rep *rep)
 {
 	uint8_t report_val = ((*rep->data) & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) ? 1 : 0;
-	dk_set_led(LED_CAPS_LOCK, report_val);
+	if (report_val)
+	{
+		pwm_set_dt(&pwm_led4, 100000000, 100000000 / 2U);
+	}
+	else
+	{
+		pwm_set_dt(&pwm_led4, 0, 0);
+	}
+	// dk_set_led(LED_CAPS_LOCK, report_val);
 }
 
 static void hids_outp_rep_handler(struct bt_hids_rep *rep,
 								  struct bt_conn *conn,
 								  bool write)
 {
+	printk("Output report read\n");
 	char addr[BT_ADDR_LE_STR_LEN];
 
 	if (!write)
@@ -406,23 +419,6 @@ static void hids_outp_rep_handler(struct bt_hids_rep *rep,
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	printk("Output report has been received %s\n", addr);
-	caps_lock_handler(rep);
-}
-
-static void hids_boot_kb_outp_rep_handler(struct bt_hids_rep *rep,
-										  struct bt_conn *conn,
-										  bool write)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	if (!write)
-	{
-		printk("Output report read\n");
-		return;
-	};
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-	printk("Boot Keyboard Output report has been received %s\n", addr);
 	caps_lock_handler(rep);
 }
 
@@ -470,6 +466,7 @@ static void hid_init(void)
 	int err;
 	struct bt_hids_init_param hids_init_obj = {0};
 	struct bt_hids_inp_rep *hids_inp_rep;
+	struct bt_hids_outp_feat_rep *hids_outp_rep;
 
 	static const uint8_t report_map[] = {
 
@@ -498,6 +495,18 @@ static void hid_init(void)
 		HID_REPORT_COUNT(4),
 		// INPUT (Data,Var,Abs)
 		HID_INPUT(0x02),
+
+		// LED test
+		0x95, 0x05, // Report Count (5)
+		0x75, 0x01, // Report Size (1)
+		0x05, 0x08, // Usage Page (LEDs)
+		0x19, 0x01, // Usage Minimum (Num Lock)
+		0x29, 0x05, // Usage Maximum (Kana)
+		0x91, 0x02, // Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+		0x95, 0x01, // Report Count (1)
+		0x75, 0x03, // Report Size (3)
+		0x91, 0x01, // Output (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+
 		HID_END_COLLECTION};
 
 	hids_init_obj.rep_map.data = report_map;
@@ -513,6 +522,13 @@ static void hid_init(void)
 	hids_inp_rep->size = 6; // 1; // 2;
 	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
 	hids_init_obj.inp_rep_group_init.cnt++;
+
+	hids_outp_rep =
+		&hids_init_obj.outp_rep_group_init.reports[OUTPUT_REP_KEYS_IDX];
+	hids_outp_rep->size = OUTPUT_REPORT_MAX_LEN;
+	hids_outp_rep->id = OUTPUT_REP_KEYS_REF_ID;
+	hids_outp_rep->handler = hids_outp_rep_handler;
+	hids_init_obj.outp_rep_group_init.cnt++;
 
 	hids_init_obj.pm_evt_handler = hids_pm_evt_handler;
 
@@ -768,15 +784,22 @@ static void bas_notify(void)
 int main(void)
 {
 
-	int rc = battery_measure_enable(true);
+	// int rc = battery_measure_enable(true);
 
-	if (rc != 0)
+	// if (rc != 0)
+	// {
+	// 	printk("Failed initialize battery measurement: %d\n", rc);
+	// 	return 0;
+	// }
+	int err;
+	if (!pwm_is_ready_dt(&pwm_led4))
 	{
-		printk("Failed initialize battery measurement: %d\n", rc);
+		printk("Error: PWM device %s is not ready\n",
+			   pwm_led4.dev->name);
 		return 0;
 	}
+	pwm_set_dt(&pwm_led4, 0, 0);
 
-	int err;
 	int blink_status = 0;
 
 	printk("Starting Bluetooth Peripheral HIDS keyboard example\n");
@@ -834,6 +857,6 @@ int main(void)
 		}
 		k_sleep(K_MSEC(ADV_LED_BLINK_INTERVAL));
 		/* Battery level simulation */
-		bas_notify();
+		// bas_notify();
 	}
 }
