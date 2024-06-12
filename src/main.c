@@ -18,6 +18,8 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/led_strip.h>
 
 #include <zephyr/settings/settings.h>
 
@@ -158,7 +160,25 @@ struct gamepad_report_t
 };
 struct gamepad_report_t gamepad;
 
-static const struct pwm_dt_spec pwm_led4 = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led4));
+#define STRIP_NODE DT_ALIAS(led_strip)
+#define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
+#define THREAD_REDLINE_PRIORITY 5
+#define REDLINE_STACK_SIZE 500
+
+K_THREAD_STACK_DEFINE(redline_stack_area, REDLINE_STACK_SIZE);
+struct k_thread redline_thread_data;
+bool red_lining = false;
+#define REDLINE_DELAY_TIME K_MSEC(50)
+struct led_rgb pixels[STRIP_NUM_PIXELS];
+static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
+
+#define RGB(_r, _g, _b)                 \
+	{                                   \
+		.r = (_r), .g = (_g), .b = (_b) \
+	}
+
+static const struct led_rgb pix_red[] = {RGB(0xFF, 0x00, 0x00)};
+static const struct led_rgb pix_off[] = {RGB(0x00, 0x00, 0x00)};
 
 /** A discharge curve specific to the power source. */
 static const struct battery_level_point levels[] = {
@@ -395,11 +415,11 @@ static void caps_lock_handler(const struct bt_hids_rep *rep)
 	uint8_t report_val = ((*rep->data) & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) ? 1 : 0;
 	if (report_val)
 	{
-		pwm_set_dt(&pwm_led4, 100000000, 100000000 / 2U);
+		red_lining = true;
 	}
 	else
 	{
-		pwm_set_dt(&pwm_led4, 0, 0);
+		red_lining = false;
 	}
 	// dk_set_led(LED_CAPS_LOCK, report_val);
 }
@@ -420,6 +440,34 @@ static void hids_outp_rep_handler(struct bt_hids_rep *rep,
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 	printk("Output report has been received %s\n", addr);
 	caps_lock_handler(rep);
+}
+
+void thread_red_line(void)
+{
+	int rc;
+
+	while (1)
+	{
+		if (red_lining)
+		{
+			memset(&pixels, 0x00, sizeof(pixels));
+			memcpy(&pixels[0], &pix_red[0], sizeof(struct led_rgb));
+			rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+			k_sleep(REDLINE_DELAY_TIME);
+
+			memset(&pixels, 0x00, sizeof(pixels));
+			memcpy(&pixels[0], &pix_off[0], sizeof(struct led_rgb));
+			rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+			k_sleep(REDLINE_DELAY_TIME);
+		}
+		else
+		{
+			memset(&pixels, 0x00, sizeof(pixels));
+			memcpy(&pixels[0], &pix_off[0], sizeof(struct led_rgb));
+			rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+			k_sleep(REDLINE_DELAY_TIME);
+		}
+	}
 }
 
 static void hids_pm_evt_handler(enum bt_hids_pm_evt evt,
@@ -838,6 +886,18 @@ int main(void)
 #endif
 
 	k_work_init(&pairing_work, pairing_process);
+
+	// if (device_is_ready(strip))
+	//{
+	k_tid_t my_tid = k_thread_create(&redline_thread_data, redline_stack_area,
+									 K_THREAD_STACK_SIZEOF(redline_stack_area),
+									 thread_red_line,
+									 NULL, NULL, NULL,
+									 THREAD_REDLINE_PRIORITY, 0, K_NO_WAIT);
+	memset(&pixels, 0x00, sizeof(pixels));
+	memcpy(&pixels[0], &pix_red[0], sizeof(struct led_rgb));
+	rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
+	//}
 
 	for (;;)
 	{
