@@ -784,21 +784,15 @@ static void bas_notify(void)
 int main(void)
 {
 
-	// int rc = battery_measure_enable(true);
+	int rc = battery_measure_enable(true);
 
-	// if (rc != 0)
-	// {
-	// 	printk("Failed initialize battery measurement: %d\n", rc);
-	// 	return 0;
-	// }
-	int err;
-	if (!pwm_is_ready_dt(&pwm_led4))
+	if (rc != 0)
 	{
-		printk("Error: PWM device %s is not ready\n",
-			   pwm_led4.dev->name);
+		printk("Failed to initialize battery measurement: %d\n", rc);
 		return 0;
 	}
-	pwm_set_dt(&pwm_led4, 0, 0);
+
+	int err;
 
 	int blink_status = 0;
 
@@ -855,8 +849,7 @@ int main(void)
 		{
 			dk_set_led_off(ADV_STATUS_LED);
 		}
+		bas_notify();
 		k_sleep(K_MSEC(ADV_LED_BLINK_INTERVAL));
-		/* Battery level simulation */
-		// bas_notify();
 	}
 }
